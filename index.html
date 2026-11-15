@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>家庭食品庫存</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+    }
+    header {
+      background: #2d6a4f;
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    header h1 { font-size: 18px; flex: 1; }
+    header span { font-size: 24px; }
+
+    .tabs {
+      display: flex;
+      background: white;
+      border-bottom: 2px solid #e0e0e0;
+      position: sticky;
+      top: 56px;
+      z-index: 99;
+    }
+    .tab {
+      flex: 1;
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 13px;
+      color: #666;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab.active {
+      color: #2d6a4f;
+      border-bottom-color: #2d6a4f;
+      font-weight: 600;
+    }
+
+    .page { display: none; padding: 16px; }
+    .page.active { display: block; }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .item-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .item-row:last-child { border-bottom: none; }
+    .item-icon { font-size: 28px; }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font-weight: 600; font-size: 15px; color: #1a1a1a; }
+    .item-meta { font-size: 12px; color: #888; margin-top: 3px; }
+    .item-expiry { font-size: 12px; margin-top: 4px; font-weight: 500; }
+    .item-qty { font-size: 14px; font-weight: 700; color: #2d6a4f; white-space: nowrap; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-urgent { background: #fde8e8; color: #c0392b; }
+    .badge-normal { background: #e8f5e9; color: #2d6a4f; }
+    .badge-expired { background: #d0021b; color: white; }
+    .badge-7 { background: #fff3cd; color: #856404; }
+    .badge-30 { background: #fff8e1; color: #e65100; }
+    .badge-90 { background: #e8f5e9; color: #2d6a4f; }
+    .badge-ok { background: #f0f4f8; color: #666; }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: #2d6a4f; color: white; }
+    .btn-primary:active { background: #1b4332; }
+    .btn-danger { background: #e74c3c; color: white; font-size: 12px; padding: 6px 12px; }
+    .btn-consume { background: #f39c12; color: white; font-size: 12px; padding: 6px 12px; }
+    .btn-block { width: 100%; margin-top: 8px; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #333;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus { border-color: #2d6a4f; }
+
+    .scan-btn {
+      width: 100%;
+      padding: 12px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1.5px solid #ddd;
+      background: white;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      color: #555;
+    }
+    .filter-btn.active {
+      background: #2d6a4f;
+      color: white;
+      border-color: #2d6a4f;
+    }
+
+    .consume-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .consume-modal.open { display: flex; }
+    .consume-sheet {
+      background: white;
+      border-radius: 20px 20px 0 0;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 480px;
+    }
+    .consume-sheet h3 { font-size: 16px; margin-bottom: 16px; }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      z-index: 300;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    .empty { text-align: center; padding: 40px 20px; color: #aaa; font-size: 14px; }
+    .empty-icon { font-size: 48px; margin-bottom: 10px; }
+
+    .log-row {
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+    }
+    .log-row:last-child { border-bottom: none; }
+    .log-row .log-name { font-weight: 600; color: #333; }
+    .log-row .log-meta { color: #888; margin-top: 2px; }
+
+    #scanner-container {
+      display: none;
+      margin-bottom: 14px;
+    }
+    #scanner-container video {
+      width: 100%;
+      border-radius: 8px;
+    }
+
+    .qty-row { display: flex; gap: 8px; }
+    .qty-row input { flex: 2; }
+    .qty-row select { flex: 1; }
+
+    .summary-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .summary-item {
+      flex: 1;
+      background: white;
+      border-radius: 10px;
+      padding: 10px 8px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .summary-item .num { font-size: 22px; font-weight: 700; }
+    .summary-item .lbl { font-size: 11px; color: #888; margin-top: 2px; }
+    .num-expired { color: #c0392b; }
+    .num-warn { color: #e67e22; }
+    .num-ok { color: #2d6a4f; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>🥫</span>
+  <h1>家庭食品庫存</h1>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showPage('list')">📋 庫存</div>
+  <div class="tab" onclick="showPage('add')">➕ 新增</div>
+  <div class="tab" onclick="showPage('log')">📝 記錄</div>
+</div>
+
+<!-- 庫存頁 -->
+<div class="page active" id="page-list">
+  <div class="summary-bar">
+    <div class="summary-item">
+      <div class="num num-ok" id="sum-total">-</div>
+      <div class="lbl">總品項</div>
+    </div>
+    <div class="summary-item">
+      <div class="num num-warn" id="sum-warn">-</div>
+      <div class="lbl">即將到期</div>
+    </div>
+    <div class="summary-item">
+      <div class="num num-expired" id="sum-exp">-</div>
+      <div class="lbl">已過期</div>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="setFilter('all', this)">全部</button>
+    <button class="filter-btn" onclick="setFilter('urgent', this)">🚨 緊急食物</button>
+    <button class="filter-btn" onclick="setFilter('normal', this)">🥫 一般食物</button>
+    <button class="filter-btn" onclick="setFilter('expiring', this)">⚠️ 快到期</button>
+    <button class="filter-btn" onclick="setFilter('expired', this)">🔴 已過期</button>
+  </div>
+
+  <div class="card" id="item-list">
+    <div class="empty"><div class="empty-icon">📦</div>載入中...</div>
+  </div>
+</div>
+
+<!-- 新增頁 -->
+<div class="page" id="page-add">
+  <div class="card">
+    <button class="scan-btn" onclick="toggleScanner()">
+      <span>📷</span> 掃描條碼自動帶入名稱
+    </button>
+    <div id="scanner-container">
+      <video id="scanner-video" autoplay playsinline muted></video>
+      <p style="font-size:12px;color:#888;margin-top:6px;text-align:center">將條碼對準鏡頭</p>
+    </div>
+
+    <div class="form-group">
+      <label>食品名稱 *</label>
+      <input type="text" id="f-name" placeholder="例：統一泡麵">
+    </div>
+    <div class="form-group">
+      <label>分類 *</label>
+      <select id="f-category">
+        <option value="緊急食物">🚨 緊急食物</option>
+        <option value="一般食物" selected>🥫 一般食物</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>數量與單位 *</label>
+      <div class="qty-row">
+        <input type="number" id="f-qty" placeholder="數量" min="1" value="1">
+        <input type="text" id="f-unit" placeholder="單位 (包/罐/盒)" style="flex:2">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>效期 *</label>
+      <input type="date" id="f-expiry">
+    </div>
+    <div class="form-group">
+      <label>條碼（掃描後自動填入）</label>
+      <input type="text" id="f-barcode" placeholder="選填">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="addItem()">新增食品</button>
+  </div>
+</div>
+
+<!-- 記錄頁 -->
+<div class="page" id="page-log">
+  <div class="card" id="log-list">
+    <div class="empty"><div class="empty-icon">📝</div>載入中...</div>
+  </div>
+</div>
+
+<!-- 消耗 Modal -->
+<div class="consume-modal" id="consume-modal">
+  <div class="consume-sheet">
+    <h3>📦 回報消耗 — <span id="consume-name"></span></h3>
+    <div class="form-group">
+      <label>用掉數量</label>
+      <input type="number" id="consume-qty" min="1" value="1">
+    </div>
+    <div class="form-group">
+      <label>回報者</label>
+      <select id="consume-user">
+        <option value="Shandi">Shandi</option>
+        <option value="Samnel">Samnel</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="submitConsume()">確認</button>
+    <button class="btn btn-block" style="background:#eee;color:#666;margin-top:8px" onclick="closeConsume()">取消</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+<script>
+const API = "https://script.google.com/macros/s/AKfycbwMlBG5X3OuZBxNaHwrR4yDA02mn9MY4X-DPvGTZf1pbmnKE9TLKDUwQy-nBe_SkkK2/exec";
+let allItems = [];
+let currentFilter = "all";
+let consumeTarget = null;
+let scanner = null;
+let scannerActive = false;
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.tab')[['list','add','log'].indexOf(name)].classList.add('active');
+  if (name === 'list') loadList();
+  if (name === 'log') loadLog();
+  if (name !== 'add') stopScanner();
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function expiryInfo(dateStr) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const exp = new Date(dateStr); exp.setHours(0,0,0,0);
+  const diff = Math.round((exp - today) / 86400000);
+  if (diff < 0) return { label: `已過期 ${-diff} 天`, cls: 'badge-expired', urgency: 0 };
+  if (diff <= 7) return { label: `${diff} 天後到期`, cls: 'badge-7', urgency: 1 };
+  if (diff <= 30) return { label: `${diff} 天後到期`, cls: 'badge-30', urgency: 2 };
+  if (diff <= 90) return { label: `${diff} 天後到期`, cls: 'badge-90', urgency: 3 };
+  return { label: `${diff} 天後到期`, cls: 'badge-ok', urgency: 4 };
+}
+
+function loadList() {
+  fetch(API + "?action=list")
+    .then(r => r.json())
+    .then(res => {
+      allItems = res.data || [];
+      renderList();
+    }).catch(() => {
+      document.getElementById('item-list').innerHTML = '<div class="empty">載入失敗，請重試</div>';
+    });
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function renderList() {
+  const container = document.getElementById('item-list');
+  let items = [...allItems];
+
+  // 統計
+  let expired = 0, warn = 0;
+  items.forEach(item => {
+    const info = expiryInfo(item['效期']);
+    if (info.urgency === 0) expired++;
+    else if (info.urgency <= 2) warn++;
+  });
+  document.getElementById('sum-total').textContent = items.length;
+  document.getElementById('sum-warn').textContent = warn;
+  document.getElementById('sum-exp').textContent = expired;
+
+  // 過濾
+  if (currentFilter === 'urgent') items = items.filter(i => i['分類'] === '緊急食物');
+  else if (currentFilter === 'normal') items = items.filter(i => i['分類'] === '一般食物');
+  else if (currentFilter === 'expiring') items = items.filter(i => expiryInfo(i['效期']).urgency <= 2);
+  else if (currentFilter === 'expired') items = items.filter(i => expiryInfo(i['效期']).urgency === 0);
+
+  // 排序：到期日近的優先
+  items.sort((a, b) => new Date(a['效期']) - new Date(b['效期']));
+
+  if (!items.length) {
+    container.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>沒有符合的品項</div>';
+    return;
+  }
+
+  container.innerHTML = items.map(item => {
+    const info = expiryInfo(item['效期']);
+    const icon = item['分類'] === '緊急食物' ? '🚨' : '🥫';
+    return `
+      <div class="item-row">
+        <div class="item-icon">${icon}</div>
+        <div class="item-info">
+          <div class="item-name">${item['名稱']}</div>
+          <div class="item-meta">
+            <span class="badge ${item['分類'] === '緊急食物' ? 'badge-urgent' : 'badge-normal'}">${item['分類']}</span>
+          </div>
+          <div class="item-expiry">
+            <span class="badge ${info.cls}">${info.label}</span>
+            <span style="color:#aaa;font-size:11px;margin-left:4px">${item['效期']}</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <div class="item-qty">${item['數量']} ${item['單位']}</div>
+          <button class="btn btn-consume" onclick="openConsume('${item['食品ID']}','${item['名稱']}')">消耗</button>
+          <button class="btn btn-danger" onclick="deleteItem('${item['食品ID']}','${item['名稱']}')">刪除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openConsume(id, name) {
+  consumeTarget = id;
+  document.getElementById('consume-name').textContent = name;
+  document.getElementById('consume-qty').value = 1;
+  document.getElementById('consume-modal').classList.add('open');
+}
+function closeConsume() {
+  document.getElementById('consume-modal').classList.remove('open');
+  consumeTarget = null;
+}
+function submitConsume() {
+  const qty = Number(document.getElementById('consume-qty').value);
+  const user = document.getElementById('consume-user').value;
+  if (!qty || qty < 1) { toast('請輸入正確數量'); return; }
+  fetch(API, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'consume', id: consumeTarget, qty, user })
+  }).then(r => r.json()).then(res => {
+    closeConsume();
+    toast(`✅ 已記錄，剩餘 ${res.remaining}`);
+    loadList();
+  }).catch(() => toast('發生錯誤'));
+}
+
+function deleteItem(id, name) {
+  if (!confirm(`確定要刪除「${name}」嗎？`)) return;
+  fetch(API, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete', id })
+  }).then(r => r.json()).then(() => {
+    toast('已刪除');
+    loadList();
+  });
+}
+
+function addItem() {
+  const name = document.getElementById('f-name').value.trim();
+  const category = document.getElementById('f-category').value;
+  const qty = document.getElementById('f-qty').value;
+  const unit = document.getElementById('f-unit').value.trim();
+  const expiry = document.getElementById('f-expiry').value;
+  const barcode = document.getElementById('f-barcode').value.trim();
+  if (!name || !qty || !unit || !expiry) { toast('請填寫所有必填欄位'); return; }
+  fetch(API, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'add', name, category, qty, unit, expiry, barcode })
+  }).then(r => r.json()).then(res => {
+    if (res.ok) {
+      toast('✅ 新增成功！');
+      document.getElementById('f-name').value = '';
+      document.getElementById('f-qty').value = '1';
+      document.getElementById('f-unit').value = '';
+      document.getElementById('f-expiry').value = '';
+      document.getElementById('f-barcode').value = '';
+      stopScanner();
+    } else {
+      toast('新增失敗，請重試');
+    }
+  }).catch(() => toast('發生錯誤'));
+}
+
+function loadLog() {
+  fetch(API + "?action=log")
+    .then(r => r.json())
+    .then(res => {
+      const logs = (res.data || []).reverse();
+      const container = document.getElementById('log-list');
+      if (!logs.length) {
+        container.innerHTML = '<div class="empty"><div class="empty-icon">📝</div>尚無消耗記錄</div>';
+        return;
+      }
+      container.innerHTML = logs.map(row => `
+        <div class="log-row">
+          <div class="log-name">${row[2]} — 用掉 ${row[3]} 個</div>
+          <div class="log-meta">${row[4]} ・ ${row[0]}</div>
+        </div>
+      `).join('');
+    });
+}
+
+async function toggleScanner() {
+  if (scannerActive) { stopScanner(); return; }
+  const container = document.getElementById('scanner-container');
+  const video = document.getElementById('scanner-video');
+  container.style.display = 'block';
+  scannerActive = true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream;
+    const codeReader = new ZXing.BrowserMultiFormatReader();
+    scanner = codeReader;
+    codeReader.decodeFromVideoElement(video, (result, err) => {
+      if (result) {
+        const barcode = result.getText();
+        document.getElementById('f-barcode').value = barcode;
+        lookupBarcode(barcode);
+        stopScanner();
+      }
+    });
+  } catch(e) {
+    toast('無法開啟相機');
+    stopScanner();
+  }
+}
+
+function stopScanner() {
+  const container = document.getElementById('scanner-container');
+  const video = document.getElementById('scanner-video');
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+  }
+  if (scanner) { try { scanner.reset(); } catch(e){} scanner = null; }
+  container.style.display = 'none';
+  scannerActive = false;
+}
+
+function lookupBarcode(barcode) {
+  toast('查詢條碼中...');
+  fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 1) {
+        const product = data.product;
+        const name = product.product_name_zh || product.product_name || product.generic_name || '';
+        if (name) {
+          document.getElementById('f-name').value = name;
+          toast(`✅ 找到：${name}`);
+        } else {
+          toast('查到條碼但無中文名稱，請手動輸入');
+        }
+      } else {
+        toast('條碼查無資料，請手動輸入');
+      }
+    }).catch(() => toast('條碼查詢失敗，請手動輸入'));
+}
+
+// 初始載入
+loadList();
+</script>
+</body>
+</html>
