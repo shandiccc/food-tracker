@@ -587,11 +587,11 @@ function scanFromFile(input) {
   codeReader.decodeFromImageUrl(url)
     .then(result => {
       const barcode = result.getText();
+      toast('條碼：' + barcode);
       document.getElementById('f-barcode').value = barcode;
       lookupBarcode(barcode);
     })
     .catch(err => {
-      console.log('scan error', err);
       toast('無法識別條碼，請手動輸入');
     })
     .finally(() => {
