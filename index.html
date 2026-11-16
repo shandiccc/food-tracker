@@ -56,25 +56,22 @@
     .card {
       background: white;
       border-radius: 12px;
-      padding: 16px;
+      padding: 8px 10px;
       margin-bottom: 12px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     }
 
-    .item-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 12px 0;
-      border-bottom: 1px solid #f0f0f0;
+    .item-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .item-table th {
+      text-align: left; padding: 6px 6px; font-size: 11px; color: #888;
+      border-bottom: 2px solid #e0e0e0; white-space: nowrap;
     }
-    .item-row:last-child { border-bottom: none; }
-    .item-icon { font-size: 28px; }
-    .item-info { flex: 1; min-width: 0; }
-    .item-name { font-weight: 600; font-size: 15px; color: #1a1a1a; }
-    .item-meta { font-size: 12px; color: #888; margin-top: 3px; }
-    .item-expiry { font-size: 12px; margin-top: 4px; font-weight: 500; }
-    .item-qty { font-size: 14px; font-weight: 700; color: #2d6a4f; white-space: nowrap; }
+    .item-table td { padding: 7px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    .item-table tr:last-child td { border-bottom: none; }
+    .item-table tr:hover td { background: #f8fffe; }
+    .item-name { font-weight: 600; color: #1a1a1a; }
+    .item-qty { font-weight: 700; color: #2d6a4f; white-space: nowrap; }
+    .td-actions { white-space: nowrap; text-align: right; }
 
     .badge {
       display: inline-block;
@@ -448,30 +445,32 @@ function renderList() {
     return;
   }
 
-  container.innerHTML = items.map(item => {
-    const info = expiryInfo(item['效期']);
-    const icon = item['分類'] === '緊急食物' ? '🚨' : '🥫';
-    return `
-      <div class="item-row">
-        <div class="item-icon">${icon}</div>
-        <div class="item-info">
-          <div class="item-name">${item['名稱']}</div>
-          <div class="item-meta">
-            <span class="badge ${item['分類'] === '緊急食物' ? 'badge-urgent' : 'badge-normal'}">${item['分類']}</span>
-          </div>
-          <div class="item-expiry">
-            <span class="badge ${info.cls}">${info.label}</span>
-            <span style="color:#aaa;font-size:11px;margin-left:4px">${item['效期']}</span>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-          <div class="item-qty">${item['數量']} ${item['單位']}</div>
-          <button class="btn btn-consume" onclick="openConsume('${item['食品ID']}','${item['名稱']}')">消耗</button>
-          <button class="btn btn-danger" onclick="deleteItem('${item['食品ID']}','${item['名稱']}')">刪除</button>
-        </div>
-      </div>
-    `;
-  }).join('');
+  container.innerHTML = `
+    <table class="item-table">
+      <thead><tr>
+        <th>名稱</th>
+        <th>數量</th>
+        <th>效期</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${items.map(item => {
+          const info = expiryInfo(item['效期']);
+          const icon = item['分類'] === '緊急食物' ? '🚨' : '🥫';
+          const expDate = String(item['效期']).slice(0, 10);
+          return `<tr>
+            <td><span class="item-name">${icon} ${item['名稱']}</span></td>
+            <td class="item-qty">${item['數量']} ${item['單位']}</td>
+            <td><span class="badge ${info.cls}">${expDate}</span></td>
+            <td class="td-actions">
+              <button class="btn btn-consume" onclick="openConsume('${item['食品ID']}','${item['名稱']}')">耗用</button>
+              <button class="btn btn-danger" onclick="deleteItem('${item['食品ID']}','${item['名稱']}')">刪</button>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 function openConsume(id, name) {
@@ -487,7 +486,7 @@ function closeConsume() {
 function submitConsume() {
   const qty = Number(document.getElementById('consume-qty').value);
   const user = document.getElementById('consume-user').value;
-  if (!qty || qty < 1) { toast('請輸入正確數量'); return; }
+  if (!qty || qty <= 0) { toast('請輸入正確數量'); return; }
   fetch(API, {
     method: 'POST',
     body: JSON.stringify({ action: 'consume', id: consumeTarget, qty, user })
@@ -519,13 +518,22 @@ function addItem(forceAdd = false) {
   if (!name || !qty || !unit || !expiry) { toast('請填寫所有必填欄位'); return; }
 
   if (barcode && !forceAdd) {
-    const existing = allItems.filter(i => i['條碼'] === barcode && Number(i['數量']) > 0);
-    if (existing.length > 0) {
-      const info = existing.map(i => `・${i['名稱']}（剩 ${i['數量']} ${i['單位']}，效期 ${i['效期'].slice(0,10)}）`).join('\n');
-      if (!confirm(`此條碼已有庫存：\n${info}\n\n確定要新增一筆嗎？`)) return;
-    }
+    fetch(API + '?action=list')
+      .then(r => r.json())
+      .then(res => {
+        const existing = (res.data || []).filter(i => i['條碼'] === barcode && Number(i['數量']) > 0);
+        if (existing.length > 0) {
+          const info = existing.map(i => `・${i['名稱']}（剩 ${i['數量']} ${i['單位']}，效期 ${String(i['效期']).slice(0,10)}）`).join('\n');
+          if (!confirm(`此條碼已有庫存：\n${info}\n\n確定要新增一筆嗎？`)) return;
+        }
+        doAdd(name, category, qty, unit, expiry, barcode);
+      }).catch(() => doAdd(name, category, qty, unit, expiry, barcode));
+  } else {
+    doAdd(name, category, qty, unit, expiry, barcode);
   }
+}
 
+function doAdd(name, category, qty, unit, expiry, barcode) {
   fetch(API, {
     method: 'POST',
     body: JSON.stringify({ action: 'add', name, category, qty, unit, expiry, barcode })
