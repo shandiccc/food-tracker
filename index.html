@@ -378,7 +378,7 @@ function showPage(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.querySelectorAll('.tab')[['list','add','log'].indexOf(name)].classList.add('active');
-  if (name === 'list') loadList();
+  if (name === 'list' || name === 'add') loadList();
   if (name === 'log') loadLog();
   if (name !== 'add') stopScanner();
 }
