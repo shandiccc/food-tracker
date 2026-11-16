@@ -297,9 +297,9 @@
     <button class="scan-btn" onclick="toggleScanner()">
       <span>📷</span> 掃描條碼自動帶入名稱
     </button>
-    <div id="scanner-container">
-      <video id="scanner-video" autoplay playsinline muted></video>
-      <p style="font-size:12px;color:#888;margin-top:6px;text-align:center">將條碼對準鏡頭</p>
+    <div id="scanner-container" style="display:none;margin-bottom:14px;">
+      <div id="qr-reader" style="width:100%;border-radius:8px;overflow:hidden;"></div>
+      <button onclick="stopScanner()" style="width:100%;margin-top:8px;padding:8px;background:#eee;border:none;border-radius:8px;font-size:13px;cursor:pointer;">關閉掃描</button>
     </div>
 
     <div class="form-group">
@@ -369,14 +369,12 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 const API = "https://script.google.com/macros/s/AKfycbxeMkXYLxufPdHu5Zfk8j0y2F3x2jrK6_5uMn_GbZDRDl4WrQK7hWkS8GoVbTA-uE5A/exec";
 let allItems = [];
 let currentFilter = "all";
 let consumeTarget = null;
-let scanner = null;
-let scannerActive = false;
 
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -579,39 +577,35 @@ function loadLog() {
     });
 }
 
-async function toggleScanner() {
+let html5QrCode = null;
+let scannerActive = false;
+
+function toggleScanner() {
   if (scannerActive) { stopScanner(); return; }
   const container = document.getElementById('scanner-container');
-  const video = document.getElementById('scanner-video');
   container.style.display = 'block';
   scannerActive = true;
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    video.srcObject = stream;
-    const codeReader = new ZXing.BrowserMultiFormatReader();
-    scanner = codeReader;
-    codeReader.decodeFromVideoElement(video, (result, err) => {
-      if (result) {
-        const barcode = result.getText();
-        document.getElementById('f-barcode').value = barcode;
-        lookupBarcode(barcode);
-        stopScanner();
-      }
-    });
-  } catch(e) {
-    toast('無法開啟相機');
-    stopScanner();
-  }
+  html5QrCode = new Html5Qrcode("qr-reader");
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 250, height: 150 } },
+    (decodedText) => {
+      document.getElementById('f-barcode').value = decodedText;
+      lookupBarcode(decodedText);
+      stopScanner();
+    },
+    () => {}
+  ).catch(() => { toast('無法開啟相機'); stopScanner(); });
 }
 
 function stopScanner() {
   const container = document.getElementById('scanner-container');
-  const video = document.getElementById('scanner-video');
-  if (video.srcObject) {
-    video.srcObject.getTracks().forEach(t => t.stop());
-    video.srcObject = null;
+  if (html5QrCode) {
+    html5QrCode.stop().catch(() => {}).finally(() => {
+      html5QrCode.clear();
+      html5QrCode = null;
+    });
   }
-  if (scanner) { try { scanner.reset(); } catch(e){} scanner = null; }
   container.style.display = 'none';
   scannerActive = false;
 }
