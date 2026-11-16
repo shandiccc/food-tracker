@@ -300,10 +300,7 @@
       <span>📷</span> 拍照掃描條碼
     </button>
     <input type="file" id="barcode-input" accept="image/*" capture="environment" style="display:none" onchange="scanFromFile(this)">
-    <div id="scanner-container" style="display:none;margin-bottom:14px;">
-      <div id="qr-reader" style="width:100%;border-radius:8px;overflow:hidden;"></div>
-      <button onclick="stopScanner()" style="width:100%;margin-top:8px;padding:8px;background:#eee;border:none;border-radius:8px;font-size:13px;cursor:pointer;">關閉掃描</button>
-    </div>
+    <canvas id="qr-canvas" style="display:none"></canvas>
 
     <div class="form-group">
       <label>食品名稱 *</label>
@@ -372,7 +369,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
 <script>
 const API = "https://script.google.com/macros/s/AKfycbxeMkXYLxufPdHu5Zfk8j0y2F3x2jrK6_5uMn_GbZDRDl4WrQK7hWkS8GoVbTA-uE5A/exec";
 let allItems = [];
@@ -584,14 +581,25 @@ function scanFromFile(input) {
   const file = input.files[0];
   if (!file) return;
   toast('解析條碼中...');
-  const html5QrCode = new Html5Qrcode("qr-reader");
-  Html5Qrcode.scanFile(file, true)
-    .then(decodedText => {
-      document.getElementById('f-barcode').value = decodedText;
-      lookupBarcode(decodedText);
-    })
-    .catch(() => toast('無法識別條碼，請手動輸入'))
-    .finally(() => { input.value = ''; });
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = function() {
+    const canvas = document.getElementById('qr-canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    const codeReader = new ZXing.BrowserMultiFormatReader();
+    codeReader.decodeFromCanvas(canvas)
+      .then(result => {
+        const barcode = result.getText();
+        document.getElementById('f-barcode').value = barcode;
+        lookupBarcode(barcode);
+      })
+      .catch(() => toast('無法識別條碼，請手動輸入'))
+      .finally(() => { input.value = ''; });
+  };
+  img.src = url;
 }
 
 function stopScanner() {}
