@@ -120,24 +120,6 @@
     }
     input:focus, select:focus { border-color: #2d6a4f; }
 
-    .scan-fab {
-      position: fixed;
-      bottom: 72px;
-      right: 20px;
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      background: #1a73e8;
-      color: white;
-      border: none;
-      font-size: 22px;
-      cursor: pointer;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 150;
-    }
 
     .section-title {
       font-size: 13px;
@@ -298,7 +280,6 @@
 <!-- 新增頁 -->
 <div class="page" id="page-add">
   <div class="card">
-    <input type="file" id="barcode-input" accept="image/*" capture="environment" style="display:none" onchange="scanFromFile(this)">
 
     <div class="form-group">
       <label>食品名稱 *</label>
@@ -329,10 +310,6 @@
     <div class="form-group">
       <label>效期 *</label>
       <input type="date" id="f-expiry">
-    </div>
-    <div class="form-group">
-      <label>條碼（掃描後自動填入）</label>
-      <input type="text" id="f-barcode" placeholder="選填">
     </div>
     <button class="btn btn-primary btn-block" onclick="addItem()">新增食品</button>
   </div>
@@ -365,11 +342,8 @@
   </div>
 </div>
 
-<button class="scan-fab" id="scan-fab" onclick="document.getElementById('barcode-input').click()">📷</button>
-
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
 <script>
 const API = "https://script.google.com/macros/s/AKfycbxeMkXYLxufPdHu5Zfk8j0y2F3x2jrK6_5uMn_GbZDRDl4WrQK7hWkS8GoVbTA-uE5A/exec";
 let allItems = [];
@@ -383,8 +357,6 @@ function showPage(name) {
   document.querySelectorAll('.tab')[['list','add','log'].indexOf(name)].classList.add('active');
   if (name === 'list' || name === 'add') loadList();
   if (name === 'log') loadLog();
-  const fab = document.getElementById('scan-fab');
-  fab.style.display = name === 'add' ? 'flex' : 'none';
 }
 
 function toast(msg) {
@@ -515,35 +487,16 @@ function deleteItem(id, name) {
   });
 }
 
-function addItem(forceAdd = false) {
+function addItem() {
   const name = document.getElementById('f-name').value.trim();
   const category = document.getElementById('f-category').value;
   const qty = document.getElementById('f-qty').value;
   const unit = document.getElementById('f-unit').value.trim();
   const expiry = document.getElementById('f-expiry').value;
-  const barcode = document.getElementById('f-barcode').value.trim();
   if (!name || !qty || !unit || !expiry) { toast('請填寫所有必填欄位'); return; }
-
-  if (barcode && !forceAdd) {
-    fetch(API + '?action=list')
-      .then(r => r.json())
-      .then(res => {
-        const existing = (res.data || []).filter(i => i['條碼'] === barcode && Number(i['數量']) > 0);
-        if (existing.length > 0) {
-          const info = existing.map(i => `・${i['名稱']}（剩 ${i['數量']} ${i['單位']}，效期 ${String(i['效期']).slice(0,10)}）`).join('\n');
-          if (!confirm(`此條碼已有庫存：\n${info}\n\n確定要新增一筆嗎？`)) return;
-        }
-        doAdd(name, category, qty, unit, expiry, barcode);
-      }).catch(() => doAdd(name, category, qty, unit, expiry, barcode));
-  } else {
-    doAdd(name, category, qty, unit, expiry, barcode);
-  }
-}
-
-function doAdd(name, category, qty, unit, expiry, barcode) {
   fetch(API, {
     method: 'POST',
-    body: JSON.stringify({ action: 'add', name, category, qty, unit, expiry, barcode })
+    body: JSON.stringify({ action: 'add', name, category, qty, unit, expiry, barcode: '' })
   }).then(r => r.json()).then(res => {
     if (res.ok) {
       toast('✅ 新增成功！');
@@ -551,8 +504,6 @@ function doAdd(name, category, qty, unit, expiry, barcode) {
       document.getElementById('f-qty').value = '1';
       document.getElementById('f-unit').value = '';
       document.getElementById('f-expiry').value = '';
-      document.getElementById('f-barcode').value = '';
-      stopScanner();
     } else {
       toast('新增失敗，請重試');
     }
@@ -578,49 +529,6 @@ function loadLog() {
     });
 }
 
-function scanFromFile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  toast('解析條碼中...');
-  const url = URL.createObjectURL(file);
-  const codeReader = new ZXing.BrowserMultiFormatReader();
-  codeReader.decodeFromImageUrl(url)
-    .then(result => {
-      const barcode = result.getText();
-      toast('條碼：' + barcode);
-      document.getElementById('f-barcode').value = barcode;
-      lookupBarcode(barcode);
-    })
-    .catch(err => {
-      toast('無法識別條碼，請手動輸入');
-    })
-    .finally(() => {
-      URL.revokeObjectURL(url);
-      input.value = '';
-    });
-}
-
-function stopScanner() {}
-
-function lookupBarcode(barcode) {
-  toast('查詢條碼中...');
-  fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`)
-    .then(r => r.json())
-    .then(data => {
-      if (data.status === 1) {
-        const product = data.product;
-        const name = product.product_name_zh || product.product_name || product.generic_name || '';
-        if (name) {
-          document.getElementById('f-name').value = name;
-          toast(`✅ 找到：${name}`);
-        } else {
-          toast('查到條碼但無中文名稱，請手動輸入');
-        }
-      } else {
-        toast('條碼查無資料，請手動輸入');
-      }
-    }).catch(() => toast('條碼查詢失敗，請手動輸入'));
-}
 
 // 初始載入
 loadList();
