@@ -120,21 +120,23 @@
     }
     input:focus, select:focus { border-color: #2d6a4f; }
 
-    .scan-btn {
-      width: 100%;
-      padding: 12px;
+    .scan-fab {
+      position: fixed;
+      bottom: 72px;
+      right: 20px;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
       background: #1a73e8;
       color: white;
       border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 22px;
       cursor: pointer;
-      margin-bottom: 14px;
-      display: flex;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+      display: none;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      z-index: 150;
     }
 
     .section-title {
@@ -296,9 +298,6 @@
 <!-- 新增頁 -->
 <div class="page" id="page-add">
   <div class="card">
-    <button class="scan-btn" onclick="document.getElementById('barcode-input').click()">
-      <span>📷</span> 拍照掃描條碼
-    </button>
     <input type="file" id="barcode-input" accept="image/*" capture="environment" style="display:none" onchange="scanFromFile(this)">
 
     <div class="form-group">
@@ -366,6 +365,8 @@
   </div>
 </div>
 
+<button class="scan-fab" id="scan-fab" onclick="document.getElementById('barcode-input').click()">📷</button>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
@@ -382,7 +383,8 @@ function showPage(name) {
   document.querySelectorAll('.tab')[['list','add','log'].indexOf(name)].classList.add('active');
   if (name === 'list' || name === 'add') loadList();
   if (name === 'log') loadLog();
-  if (name !== 'add') stopScanner();
+  const fab = document.getElementById('scan-fab');
+  fab.style.display = name === 'add' ? 'flex' : 'none';
 }
 
 function toast(msg) {
