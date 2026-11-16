@@ -493,7 +493,7 @@ function submitConsume() {
     body: JSON.stringify({ action: 'consume', id: consumeTarget, qty, user })
   }).then(r => r.json()).then(res => {
     closeConsume();
-    toast(`✅ 已記錄，剩餘 ${res.remaining}`);
+    toast(res.remaining <= 0 ? `✅ 已用完，品項已移除` : `✅ 已記錄，剩餘 ${res.remaining}`);
     loadList();
   }).catch(() => toast('發生錯誤'));
 }
@@ -509,7 +509,7 @@ function deleteItem(id, name) {
   });
 }
 
-function addItem() {
+function addItem(forceAdd = false) {
   const name = document.getElementById('f-name').value.trim();
   const category = document.getElementById('f-category').value;
   const qty = document.getElementById('f-qty').value;
@@ -517,6 +517,15 @@ function addItem() {
   const expiry = document.getElementById('f-expiry').value;
   const barcode = document.getElementById('f-barcode').value.trim();
   if (!name || !qty || !unit || !expiry) { toast('請填寫所有必填欄位'); return; }
+
+  if (barcode && !forceAdd) {
+    const existing = allItems.filter(i => i['條碼'] === barcode && Number(i['數量']) > 0);
+    if (existing.length > 0) {
+      const info = existing.map(i => `・${i['名稱']}（剩 ${i['數量']} ${i['單位']}，效期 ${i['效期'].slice(0,10)}）`).join('\n');
+      if (!confirm(`此條碼已有庫存：\n${info}\n\n確定要新增一筆嗎？`)) return;
+    }
+  }
+
   fetch(API, {
     method: 'POST',
     body: JSON.stringify({ action: 'add', name, category, qty, unit, expiry, barcode })
