@@ -296,9 +296,10 @@
 <!-- 新增頁 -->
 <div class="page" id="page-add">
   <div class="card">
-    <button class="scan-btn" onclick="toggleScanner()">
-      <span>📷</span> 掃描條碼自動帶入名稱
+    <button class="scan-btn" onclick="document.getElementById('barcode-input').click()">
+      <span>📷</span> 拍照掃描條碼
     </button>
+    <input type="file" id="barcode-input" accept="image/*" capture="environment" style="display:none" onchange="scanFromFile(this)">
     <div id="scanner-container" style="display:none;margin-bottom:14px;">
       <div id="qr-reader" style="width:100%;border-radius:8px;overflow:hidden;"></div>
       <button onclick="stopScanner()" style="width:100%;margin-top:8px;padding:8px;background:#eee;border:none;border-radius:8px;font-size:13px;cursor:pointer;">關閉掃描</button>
@@ -579,38 +580,21 @@ function loadLog() {
     });
 }
 
-let html5QrCode = null;
-let scannerActive = false;
-
-function toggleScanner() {
-  if (scannerActive) { stopScanner(); return; }
-  const container = document.getElementById('scanner-container');
-  container.style.display = 'block';
-  scannerActive = true;
-  html5QrCode = new Html5Qrcode("qr-reader");
-  html5QrCode.start(
-    { facingMode: "environment" },
-    { fps: 10, qrbox: { width: 250, height: 150 } },
-    (decodedText) => {
+function scanFromFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  toast('解析條碼中...');
+  const html5QrCode = new Html5Qrcode("qr-reader");
+  Html5Qrcode.scanFile(file, true)
+    .then(decodedText => {
       document.getElementById('f-barcode').value = decodedText;
       lookupBarcode(decodedText);
-      stopScanner();
-    },
-    () => {}
-  ).catch(() => { toast('無法開啟相機'); stopScanner(); });
+    })
+    .catch(() => toast('無法識別條碼，請手動輸入'))
+    .finally(() => { input.value = ''; });
 }
 
-function stopScanner() {
-  const container = document.getElementById('scanner-container');
-  if (html5QrCode) {
-    html5QrCode.stop().catch(() => {}).finally(() => {
-      html5QrCode.clear();
-      html5QrCode = null;
-    });
-  }
-  container.style.display = 'none';
-  scannerActive = false;
-}
+function stopScanner() {}
 
 function lookupBarcode(barcode) {
   toast('查詢條碼中...');
