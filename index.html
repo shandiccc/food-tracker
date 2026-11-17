@@ -210,9 +210,74 @@
       border-radius: 8px;
     }
 
-    .qty-row { display: flex; gap: 8px; }
-    .qty-row input { flex: 2; }
+    .qty-row { display: flex; gap: 8px; align-items: center; }
     .qty-row select { flex: 1; }
+
+    .qty-stepper {
+      display: flex;
+      align-items: center;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      flex: 2;
+    }
+    .qty-stepper button {
+      width: 44px;
+      height: 44px;
+      border: none;
+      background: #f0f4f8;
+      font-size: 22px;
+      color: #2d6a4f;
+      cursor: pointer;
+      flex-shrink: 0;
+      line-height: 1;
+      touch-action: manipulation;
+    }
+    .qty-stepper button:active { background: #d8ead3; }
+    .qty-stepper input {
+      flex: 1;
+      border: none;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #2d6a4f;
+      padding: 0;
+      min-width: 0;
+      outline: none;
+      -moz-appearance: textfield;
+    }
+    .qty-stepper input::-webkit-outer-spin-button,
+    .qty-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    /* 日期大按鈕 */
+    .date-picker-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 16px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      font-size: 16px;
+      color: #333;
+      transition: border-color 0.2s;
+      position: relative;
+    }
+    .date-picker-btn:focus-within { border-color: #2d6a4f; }
+    .date-picker-btn .date-icon { font-size: 28px; }
+    .date-picker-btn .date-text { flex: 1; text-align: left; }
+    .date-picker-btn input[type="date"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
 
     .summary-bar {
       display: flex;
@@ -295,21 +360,28 @@
     <div class="form-group">
       <label>數量與單位 *</label>
       <div class="qty-row">
-        <input type="number" id="f-qty" placeholder="數量" min="0.1" step="0.1" value="1">
-        <input type="text" id="f-unit" placeholder="單位" list="unit-list" style="flex:2">
-        <datalist id="unit-list">
-          <option value="包">
-          <option value="箱">
-          <option value="罐">
-          <option value="瓶">
-          <option value="個">
-          <option value="袋">
-        </datalist>
+        <div class="qty-stepper">
+          <button type="button" onclick="stepQty('f-qty',-1)">−</button>
+          <input type="number" id="f-qty" min="1" step="1" value="1">
+          <button type="button" onclick="stepQty('f-qty',1)">＋</button>
+        </div>
+        <select id="f-unit">
+          <option value="包" selected>包</option>
+          <option value="箱">箱</option>
+          <option value="罐">罐</option>
+          <option value="瓶">瓶</option>
+          <option value="個">個</option>
+          <option value="袋">袋</option>
+        </select>
       </div>
     </div>
     <div class="form-group">
       <label>效期 *</label>
-      <input type="date" id="f-expiry">
+      <label class="date-picker-btn" for="f-expiry">
+        <span class="date-icon">📅</span>
+        <span class="date-text" id="f-expiry-text">點此選擇日期</span>
+        <input type="date" id="f-expiry" oninput="updateDateText('f-expiry','f-expiry-text')">
+      </label>
     </div>
     <button class="btn btn-primary btn-block" onclick="addItem()">新增食品</button>
   </div>
@@ -328,7 +400,11 @@
     <h3>📦 回報消耗 — <span id="consume-name"></span></h3>
     <div class="form-group">
       <label>用掉數量</label>
-      <input type="number" id="consume-qty" min="0.1" step="0.1" value="1">
+      <div class="qty-stepper">
+        <button type="button" onclick="stepQty('consume-qty',-1)">−</button>
+        <input type="number" id="consume-qty" min="1" step="1" value="1">
+        <button type="button" onclick="stepQty('consume-qty',1)">＋</button>
+      </div>
     </div>
     <div class="form-group">
       <label>回報者</label>
@@ -491,7 +567,7 @@ function addItem() {
   const name = document.getElementById('f-name').value.trim();
   const category = document.getElementById('f-category').value;
   const qty = document.getElementById('f-qty').value;
-  const unit = document.getElementById('f-unit').value.trim();
+  const unit = document.getElementById('f-unit').value;
   const expiry = document.getElementById('f-expiry').value;
   if (!name || !qty || !unit || !expiry) { toast('請填寫所有必填欄位'); return; }
   fetch(API, {
@@ -502,15 +578,28 @@ function addItem() {
       toast('✅ 新增成功！');
       document.getElementById('f-name').value = '';
       document.getElementById('f-qty').value = '1';
-      document.getElementById('f-unit').value = '';
+      document.getElementById('f-unit').value = '包';
       document.getElementById('f-expiry').value = '';
+      document.getElementById('f-expiry-text').textContent = '點此選擇日期';
     } else {
       toast('新增失敗，請重試');
     }
   }).catch(() => toast('發生錯誤'));
 }
 
-function loadLog() {
+function stepQty(fieldId, delta) {
+  const el = document.getElementById(fieldId);
+  const val = Math.max(1, (parseInt(el.value) || 1) + delta);
+  el.value = val;
+}
+
+function updateDateText(inputId, textId) {
+  const val = document.getElementById(inputId).value;
+  const el = document.getElementById(textId);
+  el.textContent = val ? val.replace(/-/g, '/') : '點此選擇日期';
+}
+
+
   fetch(API + "?action=log")
     .then(r => r.json())
     .then(res => {
