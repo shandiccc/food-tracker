@@ -600,6 +600,7 @@ function updateDateText(inputId, textId) {
 }
 
 
+function loadLog() {
   fetch(API + "?action=log")
     .then(r => r.json())
     .then(res => {
